@@ -1,0 +1,203 @@
+# -*- mode: sh -*-
+
+#
+# Copyright 2014 Geyslan G. Bem
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# xrasengan
+#
+
+#!/bin/bash
+
+script=xrasengan
+xrandr=$(which xrandr)
+awk=$(which awk)
+
+if ! [ -x $xrandr ]; then
+   echo "$script uses xrandr. Please, install it"
+   exit 2
+fi
+
+if ! [ $awk ]; then
+   echo "$script uses awk. Please, install it"
+   exit 2
+fi
+
+get_outputs_all() {
+	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
+}
+
+get_outputs_connected() {
+	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+
+	# Workaround to turn on connected outputs that may be in suspend mode
+	# and hence are shown as disconnected
+	if [[ "$1" == "force" ]]; then
+		local time=0.5
+		if [[ $2 ]]; then
+			time=$2
+		fi
+
+		for output in $outputs_all
+		do
+			if ! list_contains "$outputs_connected" $output; then
+				xrandr --output $output --auto
+				sleep $time
+			fi
+		done
+		outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+	fi
+}
+
+get_outputs_active() {
+	outputs_active=$($xrandr | $awk '/[0-9] \(/ {print $1}')
+}
+
+get_outputs_off() {
+	outputs_off=$($xrandr | $awk '/disconnected/ {print $1}' )
+}
+
+get_outputs_all
+outputs_all_num=$(echo $outputs_all | wc -w)
+
+if [[ $outputs_all_num -eq 1 ]]; then
+	echo "You have only one (monitor) output! $script can't do nothing for you!"
+	echo "Bye!"
+	exit 0
+fi
+
+error_clone="clone option demands one or two outputs
+When one: all connected outputs will be a clone of the informed output
+  $0 clone HDMI-0
+
+When two: the second output will be a clone of the first
+  $0 clone HDMI-0 HDMI-1"
+
+invalid_argument() {
+	echo "$@"
+	exit 22
+}
+
+list_contains() {
+	local list=$1
+	local value=$2
+
+	for word in $list; do
+		[[ $word = $value ]] && return 0
+	done
+	return 1
+}
+
+check_output_valid() {
+	if [ $1 ]; then
+		if ! list_contains "$outputs_all" $1; then
+			invalid_argument "$1 is not a valid output"
+		fi
+	else
+		invalid_argument "${FUNCNAME[0]}: needs one argument"
+	fi
+}
+
+check_output_connected() {
+	check_output_valid $1
+	get_outputs_connected force
+	if [ $1 ]; then
+		if ! list_contains "$outputs_connected" $1; then
+			invalid_argument "$1 is not a connected output"
+		fi
+	else
+		invalid_argument "${FUNCNAME[0]}: needs one argument"
+	fi
+}
+
+check_output_active() {
+	check_output_connected $1
+	get_outputs_active
+	if [ $1 ]; then
+		if ! list_contains "$outputs_active" $1; then
+			invalid_argument "$1 is not an active output"
+		fi
+	else
+		invalid_argument "${FUNCNAME[0]}: needs one argument"
+	fi
+}
+
+clone() {
+	if [ $# -eq 0 ] || [ $# -gt 2 ]; then
+		 invalid_argument "$error_clone"
+	fi
+
+	check_output_active $1
+
+	case $# in
+		1)
+			for output in $outputs_connected
+			do
+				if [ $output != $1 ]; then
+					$xrandr --output $output --auto --same-as $1 --auto
+				fi
+			done
+			;;
+		2)
+			check_output_connected $2
+			$xrandr --output $2 --auto --same-as $1 --auto
+			;;
+		*)
+			;;
+	esac
+}
+
+usage() {
+	echo "Usage: $0 (implement)"
+}
+
+case "$1" in
+	--list-all | -la)
+		echo "$outputs_all"
+		;;
+	--list-connected | -lc)
+		get_outputs_connected force 0.05
+		echo "$outputs_connected"
+		;;
+	--list-active | -lac)
+		get_outputs_connected force 0.05
+		get_outputs_active
+		echo "$outputs_active"
+		;;
+	--list-off | -lo)
+		get_outputs_connected force 0.05
+		get_outputs_off
+		echo "$outputs_off"
+		;;
+	--clone | -c)
+		clone $2 $3
+		;;
+    --turn-on | -on)
+		;;
+    --turn-off | -off)
+		;;
+    --left | -l)
+		;;
+    --right | -r)
+		;;
+    --above | -a)
+		;;
+	--below | -b)
+		;;
+    --help | -h | *)
+		usage
+	  ;;
+esac
