@@ -31,52 +31,9 @@ if ! [ -x $xrandr ]; then
 	exit 2
 fi
 
-if ! [ $awk ]; then
+if ! [ -x $awk ]; then
 	echo "$script uses awk. Please, install it"
 	exit 2
-fi
-
-get_outputs_all() {
-	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
-}
-
-get_outputs_connected() {
-	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
-
-	# Workaround to turn on connected outputs that may be in suspend mode
-	# and hence are shown as disconnected
-	if [[ "$1" == "force" ]]; then
-		local time=0.5
-		if [[ $2 ]]; then
-			time=$2
-		fi
-
-		for output in $outputs_all
-		do
-			if ! list_contains "$outputs_connected" $output; then
-				xrandr --output $output --auto
-				sleep $time
-			fi
-		done
-		outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
-	fi
-}
-
-get_outputs_active() {
-	outputs_active=$($xrandr | $awk '/[0-9] \(/ {print $1}')
-}
-
-get_outputs_off() {
-	outputs_off=$($xrandr | $awk '/disconnected/ {print $1}' )
-}
-
-get_outputs_all
-outputs_all_num=$(echo $outputs_all | wc -w)
-
-if [[ $outputs_all_num -eq 1 ]]; then
-	echo "You have only one (monitor) output! $script can't do nothing for you!"
-	echo "Bye!"
-	exit 0
 fi
 
 error_clone="clone option demands one or two outputs
@@ -96,9 +53,44 @@ list_contains() {
 	local value=$2
 
 	for word in $list; do
-		[[ $word = $value ]] && return 0
+		[[ $word == $value ]] && return 0
 	done
 	return 1
+}
+
+update_outputs_all() {
+	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
+}
+
+update_outputs_connected() {
+	# Workaround to turn on connected outputs that may be in suspend mode
+	# and hence shown as disconnected
+	local times=2
+	local seconds=1
+
+	if [[ $1 ]]; then
+		times=$2
+	fi
+
+	if [[ $2 ]]; then
+		seconds=$1
+	fi
+
+	while [ $times -gt 0 ]; do
+		$xrandr 1> /dev/null
+		sleep $seconds
+		let times-=1
+	done
+
+	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+}
+
+update_outputs_active() {
+	outputs_active=$($xrandr | $awk '/[0-9] \(/ {print $1}')
+}
+
+update_outputs_disconnected() {
+	outputs_disconnected=$($xrandr | $awk '/disconnected/ {print $1}' )
 }
 
 check_output_valid() {
@@ -113,7 +105,7 @@ check_output_valid() {
 
 check_output_connected() {
 	check_output_valid $1
-	get_outputs_connected force
+	#update_outputs_connected $1
 	if [ $1 ]; then
 		if ! list_contains "$outputs_connected" $1; then
 			invalid_argument "$1 is not a connected output"
@@ -125,7 +117,7 @@ check_output_connected() {
 
 check_output_active() {
 	check_output_connected $1
-	get_outputs_active
+	#update_outputs_active
 	if [ $1 ]; then
 		if ! list_contains "$outputs_active" $1; then
 			invalid_argument "$1 is not an active output"
@@ -144,6 +136,7 @@ clone() {
 
 	case $# in
 	1)
+		# update_outputs_connected all
 		for output in $outputs_connected
 		do
 			if [ $output != $1 ]; then
@@ -164,23 +157,30 @@ usage() {
 	echo "Usage: $0 (implement)"
 }
 
+update_outputs_all
+outputs_all_num=$(echo $outputs_all | wc -w)
+update_outputs_connected
+update_outputs_active
+update_outputs_disconnected
+
+if [[ $outputs_all_num -eq 1 ]]; then
+	echo "You have only one output! $script can't do nothing for you!"
+	echo "Bye!"
+	exit 0
+fi
+
 case "$1" in
 --list-all | -la)
 	echo "$outputs_all"
 	;;
 --list-connected | -lc)
-	get_outputs_connected force 0.05
 	echo "$outputs_connected"
 	;;
 --list-active | -lac)
-	get_outputs_connected force 0.05
-	get_outputs_active
 	echo "$outputs_active"
 	;;
---list-off | -lo)
-	get_outputs_connected force 0.05
-	get_outputs_off
-	echo "$outputs_off"
+--list-disconnected | -ld)
+	echo "$outputs_disconnected"
 	;;
 --clone | -c)
 	clone $2 $3
