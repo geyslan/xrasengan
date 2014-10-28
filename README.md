@@ -1,7 +1,7 @@
 xrasengan
 =========
 
-xrasengan - xrandr wrapper
+xrandr wrapper
 
 
 Usage
