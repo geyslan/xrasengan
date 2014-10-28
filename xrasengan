@@ -27,13 +27,13 @@ xrandr=$(which xrandr)
 awk=$(which awk)
 
 if ! [ -x $xrandr ]; then
-   echo "$script uses xrandr. Please, install it"
-   exit 2
+	echo "$script uses xrandr. Please, install it"
+	exit 2
 fi
 
 if ! [ $awk ]; then
-   echo "$script uses awk. Please, install it"
-   exit 2
+	echo "$script uses awk. Please, install it"
+	exit 2
 fi
 
 get_outputs_all() {
@@ -137,26 +137,26 @@ check_output_active() {
 
 clone() {
 	if [ $# -eq 0 ] || [ $# -gt 2 ]; then
-		 invalid_argument "$error_clone"
+		invalid_argument "$error_clone"
 	fi
 
 	check_output_active $1
 
 	case $# in
-		1)
-			for output in $outputs_connected
-			do
-				if [ $output != $1 ]; then
-					$xrandr --output $output --auto --same-as $1 --auto
-				fi
-			done
-			;;
-		2)
-			check_output_connected $2
-			$xrandr --output $2 --auto --same-as $1 --auto
-			;;
-		*)
-			;;
+	1)
+		for output in $outputs_connected
+		do
+			if [ $output != $1 ]; then
+				$xrandr --output $output --auto --same-as $1 --auto
+			fi
+		done
+		;;
+	2)
+		check_output_connected $2
+		$xrandr --output $2 --auto --same-as $1 --auto
+		;;
+	*)
+		;;
 	esac
 }
 
@@ -165,39 +165,39 @@ usage() {
 }
 
 case "$1" in
-	--list-all | -la)
-		echo "$outputs_all"
-		;;
-	--list-connected | -lc)
-		get_outputs_connected force 0.05
-		echo "$outputs_connected"
-		;;
-	--list-active | -lac)
-		get_outputs_connected force 0.05
-		get_outputs_active
-		echo "$outputs_active"
-		;;
-	--list-off | -lo)
-		get_outputs_connected force 0.05
-		get_outputs_off
-		echo "$outputs_off"
-		;;
-	--clone | -c)
-		clone $2 $3
-		;;
-    --turn-on | -on)
-		;;
-    --turn-off | -off)
-		;;
-    --left | -l)
-		;;
-    --right | -r)
-		;;
-    --above | -a)
-		;;
-	--below | -b)
-		;;
-    --help | -h | *)
-		usage
-	  ;;
+--list-all | -la)
+	echo "$outputs_all"
+	;;
+--list-connected | -lc)
+	get_outputs_connected force 0.05
+	echo "$outputs_connected"
+	;;
+--list-active | -lac)
+	get_outputs_connected force 0.05
+	get_outputs_active
+	echo "$outputs_active"
+	;;
+--list-off | -lo)
+	get_outputs_connected force 0.05
+	get_outputs_off
+	echo "$outputs_off"
+	;;
+--clone | -c)
+	clone $2 $3
+	;;
+--turn-on | -on)
+	;;
+--turn-off | -off)
+	;;
+--left | -l)
+	;;
+--right | -r)
+	;;
+--above | -a)
+	;;
+--below | -b)
+	;;
+--help | -h | *)
+	usage
+	;;
 esac
