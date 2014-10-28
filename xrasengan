@@ -36,12 +36,14 @@ if ! [ -x $awk ]; then
 	exit 2
 fi
 
+
 error_clone="clone option demands one or two outputs
 When one: all connected outputs will be a clone of the informed output
   $0 clone HDMI-0
 
 When two: the second output will be a clone of the first
   $0 clone HDMI-0 HDMI-1"
+
 
 invalid_argument() {
 	echo "$@"
@@ -105,7 +107,6 @@ check_output_valid() {
 
 check_output_connected() {
 	check_output_valid $1
-	#update_outputs_connected $1
 	if [ $1 ]; then
 		if ! list_contains "$outputs_connected" $1; then
 			invalid_argument "$1 is not a connected output"
@@ -117,7 +118,6 @@ check_output_connected() {
 
 check_output_active() {
 	check_output_connected $1
-	#update_outputs_active
 	if [ $1 ]; then
 		if ! list_contains "$outputs_active" $1; then
 			invalid_argument "$1 is not an active output"
@@ -136,7 +136,7 @@ clone() {
 
 	case $# in
 	1)
-		# update_outputs_connected all
+		$xrandr --output $1 --primary
 		for output in $outputs_connected
 		do
 			if [ $output != $1 ]; then
@@ -151,6 +151,10 @@ clone() {
 	*)
 		;;
 	esac
+}
+
+notify() {
+	echo "implement option to display in gui or just echo in bash"
 }
 
 usage() {
