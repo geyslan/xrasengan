@@ -1,0 +1,86 @@
+# -*- mode: sh -*-
+
+#
+# Copyright 2014 Geyslan G. Bem
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+#
+# xrasengan bash completion
+#
+
+#!/bin/bash
+
+_xrasengan()
+{
+	local cur prev OPTS
+	COMREPLY=()
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+	prev_prev="${COMP_WORDS[COMP_CWORD-2]}"
+
+	update_outputs_connected() {
+		# Workaround to turn on connected outputs that may be in suspend mode
+		# and hence shown as disconnected
+		local times=5
+		local seconds=0.1
+
+		if [[ $1 ]]; then
+			times=$2
+		fi
+
+		if [[ $2 ]]; then
+			seconds=$1
+		fi
+
+		while [ $times -gt 0 ]; do
+			$xrandr 1> /dev/null
+			sleep $seconds
+			let times-=1
+		done
+
+		OPTS="$(xrandr | awk '/ connected/ {print $1}')"
+	}
+
+	case $cur in
+	--*)
+		OPTS="--list-all --list-connected --list-active --list-disconnected --clone"
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	-*)
+		COMPREPLY=( $(compgen -W "-la -lc -lac -ld -c -on -off -l -r -a -b -h" -- $cur) )
+		return 0
+		;;
+
+	esac
+
+	case $prev in
+	-c | --clone)
+		OPTS="$(xrandr | awk '/[0-9] \(/ {print $1}')"
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	esac
+
+	case $prev_prev in
+	-c | --clone)
+		update_outputs_connected
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	esac
+
+}
+complete -F _xrasengan xrasengan
