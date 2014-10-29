@@ -1,7 +1,7 @@
 xrasengan
 =========
 
-xrandr wrapper
+An xrandr wrapper to make your multi-monitor setup easier
 
 
 Usage
