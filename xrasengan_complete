@@ -55,12 +55,13 @@ _xrasengan()
 
 	case $cur in
 	--*)
-		OPTS="--list-all --list-connected --list-active --list-disconnected --clone"
+		OPTS="--list-all --list-connected --list-active --list-disconnected --clone --turn-on"
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		COMPREPLY=( $(compgen -W "-la -lc -lac -ld -c -on -off -l -r -a -b -h" -- $cur) )
+		OPTS="la -lc -lac -ld -c -on -off -l -r -a -b -h -on"
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 
@@ -68,7 +69,8 @@ _xrasengan()
 
 	case $prev in
 	-c | --clone)
-		OPTS="$(xrandr | awk '/[0-9] \(/ {print $1}')"
+		# OPTS="$(xrandr | awk '/[0-9] \(/ {print $1}')"
+		OPTS="$($xrandr | $awk '/mm$/ {print $1}')"
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
