@@ -54,10 +54,11 @@ When one: all connected outputs will be a clone of the informed output
 When two: the second output will be a clone of the first
   $0 -c HDMI-0 HDMI-1"
 
-error_turn_on="turn-on option demands one output (that set --auto option in xrandr)
+error_turn_on="turn-on option demands one or two arguments
+When one: the informed output will be turned on with xrandr --auto option
   $0 --turn-on HDMI-0
-Or
-  $0 -on DisplayPort-0"
+When two: the informed output will be turned on with the informed --mode
+  $0 -on DisplayPort-0 1920x1080"
 
 
 invalid_argument() {
@@ -85,11 +86,11 @@ update_outputs_connected() {
 	local times=2
 	local seconds=1
 
-	if [[ $1 ]]; then
+	if [ $1 ]; then
 		times=$1
 	fi
 
-	if [[ $2 ]]; then
+	if [ $2 ]; then
 		seconds=$2
 	fi
 
@@ -108,7 +109,22 @@ update_outputs_active() {
 }
 
 update_outputs_disconnected() {
-	outputs_disconnected=$($xrandr | $awk '/disconnected/ {print $1}' )
+	outputs_disconnected=$($xrandr | $awk '/disconnected/ {print $1}')
+}
+
+is_mode_available() {
+	if ! [ $1 ] || ! [ $2 ]; then
+		invalid_argument "${FUNCNAME[0]}: needs two arguments (output and mode)"
+	fi
+
+	local output=$1
+	local modes=$($xrandr | $awk '/'"$output"'/ {f=1;next} ! /^ /{f=0} f {print $1}')
+
+	if ! list_contains "$modes" $2; then
+		return 1
+	else
+		return 0
+	fi
 }
 
 check_output_valid() {
@@ -184,12 +200,21 @@ clone() {
 }
 
 turn_on() {
-	if [ $# -eq 0 ] || [ $# -gt 1 ]; then
+	if [ $# -eq 0 ] || [ $# -gt 2 ]; then
 		invalid_argument "$error_turn_on"
 	fi
 
 	if check_output_active $1; then
 		invalid_argument "$1 is already an active output"
+	fi
+
+	if [ $2 ]; then
+		if ! is_mode_available $1 $2; then
+			invalid_argument "$2 is not an available mode for $1 output"
+		fi
+		$xrandr --output $1 --mode $2
+	else
+		$xrandr --output $1 --auto
 	fi
 }
 
@@ -204,8 +229,7 @@ update_outputs_active
 update_outputs_disconnected
 
 if [[ $outputs_all_num -eq 1 ]]; then
-	echo "You have only one output! $script can't do nothing for you!"
-	echo "Bye!"
+	notify "You have only one output! $script can't do nothing for you! Bye!"
 	exit 0
 fi
 
@@ -227,7 +251,7 @@ case "$1" in
 	notify "$3 is clone of $2"
 	;;
 --turn-on | -on)
-	turn_on $2
+	turn_on $2 $3
 	notify "$2 turned on"
 	;;
 --turn-off | -off)
