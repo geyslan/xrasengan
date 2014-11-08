@@ -60,6 +60,17 @@ When one: the informed output will be turned on with xrandr --auto option
 When two: the informed output will be turned on with the informed --mode
   $0 -on DisplayPort-0 1920x1080"
 
+error_turn_off="turn-off option demands one argument
+The informed output will be turned off with xrandr --off option
+  $0 --turn-off HDMI-0
+Or
+  $0 -off DisplayPort-0"
+
+error_left="left option demands two arguments
+First is the base output, second is the one to be in the left side of the base output
+Here, HDMI-0 is the base and DVI-1 the left
+  $0 --left HDMI-0 DVI-1"
+
 
 invalid_argument() {
 	echo "$@"
@@ -71,7 +82,7 @@ list_contains() {
 	local value=$2
 
 	for word in $list; do
-		[[ $word == $value ]] && return 0
+		[ $word == $value ] && return 0
 	done
 	return 1
 }
@@ -118,7 +129,7 @@ is_mode_available() {
 	fi
 
 	local output=$1
-	local modes=$($xrandr | $awk '/'"$output"'/ {f=1;next} ! /^ /{f=0} f {print $1}')
+	local modes=$($xrandr | $awk '/'"$output"'/{f=1;next} !/^ /{f=0} f {print $1}')
 
 	if ! list_contains "$modes" $2; then
 		return 1
@@ -180,8 +191,10 @@ clone() {
 		invalid_argument "$1 is not an active output"
 	fi
 
-	case $# in
-	1)
+	if [ $2 ]; then
+		check_output_connected $2
+		$xrandr --output $2 --auto --same-as $1 --auto
+	else
 		$xrandr --output $1 --primary
 		for output in $outputs_connected
 		do
@@ -189,14 +202,7 @@ clone() {
 				$xrandr --output $output --auto --same-as $1 --auto
 			fi
 		done
-		;;
-	2)
-		check_output_connected $2
-		$xrandr --output $2 --auto --same-as $1 --auto
-		;;
-	*)
-		;;
-	esac
+	fi
 }
 
 turn_on() {
@@ -212,10 +218,39 @@ turn_on() {
 		if ! is_mode_available $1 $2; then
 			invalid_argument "$2 is not an available mode for $1 output"
 		fi
-		$xrandr --output $1 --mode $2
+		$xrandr --output $1 --mode $2 --auto
 	else
 		$xrandr --output $1 --auto
 	fi
+}
+
+turn_off() {
+	if [ $# -ne 1 ]; then
+		invalid_argument "$error_turn_off"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is already an inactive output"
+	fi
+
+	if [ $outputs_active_num -eq 1 ]; then
+		invalid_argument "$1 is the unique active output. It's impossible to turn it off"
+	fi
+
+	$xrandr --output $1 --off
+}
+
+left() {
+	if [ $# -ne 2 ]; then
+		invalid_argument "$error_left"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is not an active output"
+	fi
+
+	check_output_connected $2
+	$xrandr --output $2 --auto --left-of $1 --auto
 }
 
 usage() {
@@ -226,9 +261,10 @@ update_outputs_all
 outputs_all_num=$(echo $outputs_all | wc -w)
 update_outputs_connected
 update_outputs_active
+outputs_active_num=$(echo $outputs_active | wc -w)
 update_outputs_disconnected
 
-if [[ $outputs_all_num -eq 1 ]]; then
+if [ $outputs_all_num -eq 1 ]; then
 	notify "You have only one output! $script can't do nothing for you! Bye!"
 	exit 0
 fi
@@ -255,14 +291,20 @@ case "$1" in
 	notify "$2 turned on"
 	;;
 --turn-off | -off)
+	turn_off $2
+	notify "$2 turned off"
 	;;
 --left | -l)
+	left $2 $3
+	notify "$3 is left of $2"
 	;;
 --right | -r)
 	;;
 --above | -a)
 	;;
 --below | -b)
+	;;
+--primary | -p)
 	;;
 --help | -h | *)
 	usage

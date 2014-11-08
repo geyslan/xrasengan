@@ -25,8 +25,8 @@
 update_outputs_connected() {
 	# Workaround to turn on connected outputs that may be in suspend mode
 	# and hence shown as disconnected
-	local times=5
-	local seconds=0.1
+	local times=2
+	local seconds=1
 
 	if [[ $1 ]]; then
 		times=$2
@@ -41,20 +41,25 @@ update_outputs_connected() {
 		sleep $seconds
 		let times-=1
 	done
+	OPTS="$(xrandr | awk '/ connected/ {print $1}')"
 }
 
-update_available_modes() {
-	if ! [ $1 ]; then
-		invalid_argument "${FUNCNAME[0]}: needs one argument (output)"
-	fi
+update_outputs_connected_inactive() {
+	OPTS="$(xrandr | awk '/ connected/ && /\)$/ {print $1}')"
+}
 
+update_outputs_active() {
+	OPTS="$(xrandr | awk '/mm$/ {print $1}')"
+}
+
+update_output_modes() {
 	local output=$1
-	OPTS=$(xrandr | awk '/'"$output"'/ {f=1;next} ! /^ /{f=0} f {print $1}')
+	OPTS=$(xrandr | awk '/'"$output"'/ {f=1;next} !/^ /{f=0} f {print $1}')
 }
 
 _xrasengan()
 {
-	local cur prev OPTS
+	local cur prev prev_prev OPTS
 	COMREPLY=()
 	cur="${COMP_WORDS[COMP_CWORD]}"
 	prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -62,12 +67,12 @@ _xrasengan()
 
 	case $cur in
 	--*)
-		OPTS="--list-all --list-connected --list-active --list-disconnected --clone --turn-on"
+		OPTS=$(echo "--list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		OPTS="la -lc -lac -ld -c -on -off -l -r -a -b -h"
+		OPTS=$(echo "-la -lc -lac -ld -c -on -off -l -r -a -b -p -h" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
@@ -78,13 +83,25 @@ _xrasengan()
 
 	case $prev in
 	--clone | -c)
-		# OPTS="$(xrandr | awk '/[0-9] \(/ {print $1}')"
-		OPTS="$(xrandr | awk '/mm$/ {print $1}')"
+		update_outputs_active
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	--turn-on | -on)
-		OPTS="$(xrandr | awk '/ connected / && /\)$/ {print $1}')"
+		update_outputs_connected_inactive
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	--turn-off | -off)
+		update_outputs_active
+		if [ $(echo $OPTS | wc -w) -eq 1 ]; then
+			OPTS=""
+		fi
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	--left | -l)
+		update_outputs_active
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
@@ -92,12 +109,18 @@ _xrasengan()
 
 	case $prev_prev in
 	--clone | -c)
-		OPTS="$(xrandr | awk '/ connected/ {print $1}')"
+		if [ $(echo $OPTS | wc -w) -eq 1 ]; then
+			OPTS=""
+		fi
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	--turn-on | -on)
-		update_available_modes $prev
+		update_output_modes
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		return 0
+		;;
+	--left | -l)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
