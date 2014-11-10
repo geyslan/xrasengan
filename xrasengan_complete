@@ -22,7 +22,22 @@
 
 #!/bin/bash
 
+list_contains() {
+	local list=$1
+	local value=$2
+
+	for word in $list; do
+		[ $word == $value ] && return 0
+	done
+	return 1
+}
+
 update_outputs_connected() {
+	if ! [[ $force ]]; then
+		OPTS="$(xrandr | awk '/ connected/ {print $1}')"
+		return
+	fi
+
 	# Workaround to turn on connected outputs that may be in suspend mode
 	# and hence shown as disconnected
 	local times=2
@@ -65,14 +80,20 @@ _xrasengan()
 	prev="${COMP_WORDS[COMP_CWORD-1]}"
 	prev_prev="${COMP_WORDS[COMP_CWORD-2]}"
 
+	if list_contains "${COMP_WORDS[*]}" "--force" || list_contains "${COMP_WORDS[*]}" "-f"; then
+		force="force"
+	else
+		force=""
+	fi
+
 	case $cur in
 	--*)
-		OPTS=$(echo "--list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left" | sort)
+		OPTS=$(echo "--force --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		OPTS=$(echo "-la -lc -lac -ld -c -on -off -l -r -a -b -p -h" | sort)
+		OPTS=$(echo "-f -la -lc -lac -ld -c -on -off -l -r -a -b -p -h" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;

@@ -26,6 +26,7 @@ script=xrasengan
 xrandr=$(which xrandr 2> /dev/null)
 awk=$(which awk 2> /dev/null)
 notifier=$(which notify-send 2> /dev/null)
+force=""
 
 if ! [ -x "$xrandr" ]; then
 	echo "$script uses xrandr. Please, install it"
@@ -67,9 +68,14 @@ Or
   $0 -off DisplayPort-0"
 
 error_left="left option demands two arguments
-First is the base output, second is the one to be in the left side of the base output
+First is the base output, second is the one to be on the left side of the base output
 Here, HDMI-0 is the base and DVI-1 the left
   $0 --left HDMI-0 DVI-1"
+
+error_left="right option demands two arguments
+First is the base output, second is the one to be on the right side of the base output
+Here, HDMI-0 is the base and DVI-1 the right
+  $0 --right HDMI-0 DVI-1"
 
 
 invalid_argument() {
@@ -91,7 +97,16 @@ update_outputs_all() {
 	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
 }
 
+update_outputs_all_num() {
+	outputs_all_num=$(echo $outputs_all | wc -w)
+}
+
 update_outputs_connected() {
+	if ! [[ $force ]]; then
+		outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+		return
+	fi
+
 	# Workaround to turn on connected outputs that may be in suspend mode
 	# and hence shown as disconnected
 	local times=2
@@ -117,6 +132,10 @@ update_outputs_connected() {
 update_outputs_active() {
 	# outputs_active=$($xrandr | $awk '/[0-9] \(/ {print $1}')
 	outputs_active=$($xrandr | $awk '/mm$/ {print $1}')
+}
+
+update_outputs_active_num() {
+	outputs_active_num=$(echo $outputs_active | wc -w)
 }
 
 update_outputs_disconnected() {
@@ -253,60 +272,93 @@ left() {
 	$xrandr --output $2 --auto --left-of $1 --auto
 }
 
+right() {
+	if [ $# -ne 2 ]; then
+		invalid_argument "$error_right"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is not an active output"
+	fi
+
+	check_output_connected $2
+	$xrandr --output $2 --auto --right-of $1 --auto
+}
+
 usage() {
 	echo "Usage: $0 (implement)"
 }
 
+if list_contains "$*" "--force" || list_contains "$*" "-f"; then
+	set -- ${@/$arg/};
+	force="force";
+fi
+
 update_outputs_all
-outputs_all_num=$(echo $outputs_all | wc -w)
-update_outputs_connected
-update_outputs_active
-outputs_active_num=$(echo $outputs_active | wc -w)
-update_outputs_disconnected
+update_outputs_all_num
 
 if [ $outputs_all_num -eq 1 ]; then
 	notify "You have only one output! $script can't do nothing for you! Bye!"
 	exit 0
 fi
 
-case "$1" in
---list-all | -la)
-	echo "$outputs_all"
-	;;
---list-connected | -lc)
-	echo "$outputs_connected"
-	;;
---list-active | -lac)
-	echo "$outputs_active"
-	;;
---list-disconnected | -ld)
-	echo "$outputs_disconnected"
-	;;
---clone | -c)
-	clone $2 $3
-	notify "$3 is clone of $2"
-	;;
---turn-on | -on)
-	turn_on $2 $3
-	notify "$2 turned on"
-	;;
---turn-off | -off)
-	turn_off $2
-	notify "$2 turned off"
-	;;
---left | -l)
-	left $2 $3
-	notify "$3 is left of $2"
-	;;
---right | -r)
-	;;
---above | -a)
-	;;
---below | -b)
-	;;
---primary | -p)
-	;;
---help | -h | *)
-	usage
-	;;
-esac
+while [[ $# -ge 1 ]]
+do
+	key="$1"
+	shift
+
+	update_outputs_connected
+	update_outputs_disconnected
+	update_outputs_active
+	update_outputs_active_num
+
+	case $key in
+	--list-all | -la)
+		echo "$outputs_all"
+		;;
+	--list-connected | -lc)
+		echo "$outputs_connected"
+		;;
+	--list-active | -lac)
+		echo "$outputs_active"
+		;;
+	--list-disconnected | -ld)
+		echo "$outputs_disconnected"
+		;;
+	--clone | -c)
+		clone $1 $2
+		notify "$2 is clone of $1"
+		shift 2
+		;;
+	--turn-on | -on)
+		turn_on $1 $2
+		notify "$1 turned on"
+		shift 2
+		;;
+	--turn-off | -off)
+		turn_off $1
+		notify "$1 turned off"
+		shift
+		;;
+	--left | -l)
+		left $1 $2
+		notify "$2 is on left of $1"
+		shift 2
+		;;
+	--right | -r)
+		right $1 $2
+		notify "$2 is on right of $1"
+		shift 2
+		;;
+	--above | -a)
+		;;
+	--below | -b)
+		;;
+	--primary | -p)
+		;;
+	--help | -h | *)
+		usage
+		break
+		;;
+	esac
+done
