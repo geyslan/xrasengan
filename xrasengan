@@ -72,11 +72,26 @@ First is the base output, second is the one to be on the left side of the base o
 Here, HDMI-0 is the base and DVI-1 the left
   $0 --left HDMI-0 DVI-1"
 
-error_left="right option demands two arguments
+error_right="right option demands two arguments
 First is the base output, second is the one to be on the right side of the base output
 Here, HDMI-0 is the base and DVI-1 the right
   $0 --right HDMI-0 DVI-1"
 
+error_above="above option demands two arguments
+First is the base output, second is the one to be on the above side of the base output
+Here, HDMI-0 is the base and DVI-1 the above
+  $0 --above HDMI-0 DVI-1"
+
+error_below="below option demands two arguments
+First is the base output, second is the one to be on the below side of the base output
+Here, HDMI-0 is the base and DVI-1 the below
+  $0 --below HDMI-0 DVI-1"
+
+error_primary="primary option demands one argument
+The informed output will be set as primary with xrandr --primary option
+  $0 --primary HDMI-0
+Or
+  $0 -p DisplayPort-0"
 
 invalid_argument() {
 	echo "$@"
@@ -112,20 +127,11 @@ update_outputs_connected() {
 	local times=2
 	local seconds=1
 
-	if [ $1 ]; then
-		times=$1
-	fi
-
-	if [ $2 ]; then
-		seconds=$2
-	fi
-
 	while [ $times -gt 0 ]; do
 		$xrandr 1> /dev/null
 		sleep $seconds
 		let times-=1
 	done
-
 	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
 }
 
@@ -285,20 +291,84 @@ right() {
 	$xrandr --output $2 --auto --right-of $1 --auto
 }
 
-usage() {
-	echo "Usage: $0 (implement)"
+above() {
+	if [ $# -ne 2 ]; then
+		invalid_argument "$error_above"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is not an active output"
+	fi
+
+	check_output_connected $2
+	$xrandr --output $2 --auto --above $1 --auto
 }
 
+above() {
+	if [ $# -ne 2 ]; then
+		invalid_argument "$error_below"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is not an active output"
+	fi
+
+	check_output_connected $2
+	$xrandr --output $2 --auto --below $1 --auto
+}
+
+primary() {
+	if [ $# -ne 1 ]; then
+		invalid_argument "$error_primary"
+	fi
+
+	if ! check_output_active $1; then
+		invalid_argument "$1 is not an active output"
+	fi
+
+	$xrandr --output $1 --primary
+}
+
+usage() {
+	echo "usage: $script [options]
+  where options are:
+  --help or -h
+  --force or -f (workaround to turn on suspended outputs; will hang for 2 seconds)
+  --list-all or -la
+  --list-connected or -lc
+  --list-active or -la
+  --list-disconnected or -ld
+  --clone <base-output> or -c <base-output> <cloned-output>
+  --turn-on <output> or -on <output> <mode>
+  --turn-off <output> or -off <output>
+  --left <base-output> <left-output> or -l <base-output> <left-output>
+  --right <base-output> <right-output> or -r <base-output> <right-output>
+  --above <base-output> <above-above> or -a <base-output> <above-output>
+  --below <base-output> <below-output> or -b <base-output> <below-output>
+  --primary <output> or -p <output>"
+}
+
+if [[ $# -eq 0 ]] || list_contains "$*" "--help" || list_contains "$*" "-h"; then
+	usage
+	exit 0
+fi
+
 if list_contains "$*" "--force" || list_contains "$*" "-f"; then
-	set -- ${@/$arg/};
+	set -- ${@/"--force"/};
+	set -- ${@/"-f"/};
 	force="force";
+	if [[ $# -eq 0 ]]; then
+		usage
+		exit 0
+	fi
 fi
 
 update_outputs_all
 update_outputs_all_num
 
 if [ $outputs_all_num -eq 1 ]; then
-	notify "You have only one output! $script can't do nothing for you! Bye!"
+	notify "You have only one output! $script can't do nothing for you!
+For more options use xrandr. Bye!"
 	exit 0
 fi
 
@@ -351,12 +421,21 @@ do
 		shift 2
 		;;
 	--above | -a)
+		above $1 $2
+		notify "$2 is above of $1"
+		shift 2
 		;;
 	--below | -b)
+		below $1 $2
+		notify "$2 is below of $1"
+		shift 2
 		;;
 	--primary | -p)
+		primary $1
+		notify "$1 set as primary"
+		shift
 		;;
-	--help | -h | *)
+	*)
 		usage
 		break
 		;;

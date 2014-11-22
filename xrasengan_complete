@@ -43,14 +43,6 @@ update_outputs_connected() {
 	local times=2
 	local seconds=1
 
-	if [[ $1 ]]; then
-		times=$2
-	fi
-
-	if [[ $2 ]]; then
-		seconds=$1
-	fi
-
 	while [ $times -gt 0 ]; do
 		$xrandr 1> /dev/null
 		sleep $seconds
@@ -68,8 +60,8 @@ update_outputs_active() {
 }
 
 update_output_modes() {
-	local output=$1
-	OPTS=$(xrandr | awk '/'"$output"'/ {f=1;next} !/^ /{f=0} f {print $1}')
+	local output="$1"
+	OPTS="$(xrandr | awk '/'$output'/ {f=1;next} !/^ /{f=0} f {print $1}')"
 }
 
 _xrasengan()
@@ -88,12 +80,12 @@ _xrasengan()
 
 	case $cur in
 	--*)
-		OPTS=$(echo "--force --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left" | sort)
+		OPTS=$(echo "--force --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		OPTS=$(echo "-f -la -lc -lac -ld -c -on -off -l -r -a -b -p -h" | sort)
+		OPTS=$(echo "-f -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
@@ -103,7 +95,7 @@ _xrasengan()
 	update_outputs_connected
 
 	case $prev in
-	--clone | -c)
+		--clone | -c | --turn-off | -off | --left | -l | --right | -r | --above | -a | --below | -b | --primary | -p)
 		update_outputs_active
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
@@ -113,35 +105,16 @@ _xrasengan()
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
-	--turn-off | -off)
-		update_outputs_active
-		if [ $(echo $OPTS | wc -w) -eq 1 ]; then
-			OPTS=""
-		fi
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
-		return 0
-		;;
-	--left | -l)
-		update_outputs_active
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
-		return 0
-		;;
+
 	esac
 
 	case $prev_prev in
-	--clone | -c)
-		if [ $(echo $OPTS | wc -w) -eq 1 ]; then
-			OPTS=""
-		fi
+	--clone | -c | --left | -l | --right | -r | --above | -a | --below | -b)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	--turn-on | -on)
-		update_output_modes
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
-		return 0
-		;;
-	--left | -l)
+		update_output_modes $prev
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
