@@ -304,7 +304,7 @@ above() {
 	$xrandr --output $2 --auto --above $1 --auto
 }
 
-above() {
+below() {
 	if [ $# -ne 2 ]; then
 		invalid_argument "$error_below"
 	fi
