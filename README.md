@@ -3,17 +3,24 @@ xrasengan
 
 An xrandr wrapper to make your multi-monitor setup easier
 
+Installation/Uninstallation
+---------------------------
+
+`make install`
+
+`make uninstall`
+
+If not root, you will need do it as a sudo user.
+
 
 Usage
 -----
-`xrasengan --force --on DisplayPort-0 --off HDMI-0`
 
+`xrasengan --force --on DisplayPort-0 --off HDMI-0`
 
 `xrasengan --list-all`
 
-
 `xrasengan --list-connected`
-
 
 `xrasengan --clone HDMI-0`
 
@@ -21,6 +28,7 @@ Usage
 
 
 See all options through:
+------------------------
 
 `xrasengan --help`
 
