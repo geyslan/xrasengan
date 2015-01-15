@@ -94,7 +94,7 @@ Or
   $0 -p DisplayPort-0"
 
 invalid_argument() {
-	echo "$@"
+	notify "$@"
 	exit 22
 }
 
@@ -109,16 +109,8 @@ list_contains() {
 }
 
 update_outputs_all() {
-	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
-}
-
-update_outputs_all_num() {
-	outputs_all_num=$(echo $outputs_all | wc -w)
-}
-
-update_outputs_connected() {
 	if ! [[ $force ]]; then
-		outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+		outputs_all=$($xrandr | $awk '/connected/ {print $1}')
 		return
 	fi
 
@@ -132,6 +124,14 @@ update_outputs_connected() {
 		sleep $seconds
 		let times-=1
 	done
+	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
+}
+
+update_outputs_all_num() {
+	outputs_all_num=$(echo $outputs_all | wc -w)
+}
+
+update_outputs_connected() {
 	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
 }
 
@@ -212,9 +212,7 @@ clone() {
 		invalid_argument "$error_clone"
 	fi
 
-	if ! check_output_active $1; then
-		invalid_argument "$1 is not an active output"
-	fi
+	check_output_active $1
 
 	if [ $2 ]; then
 		check_output_connected $2
@@ -235,9 +233,7 @@ turn_on() {
 		invalid_argument "$error_turn_on"
 	fi
 
-	if check_output_active $1; then
-		invalid_argument "$1 is already an active output"
-	fi
+	check_output_active $1
 
 	if [ $2 ]; then
 		if ! is_mode_available $1 $2; then
@@ -365,6 +361,9 @@ fi
 
 update_outputs_all
 update_outputs_all_num
+update_outputs_connected
+update_outputs_disconnected
+
 
 if [ $outputs_all_num -eq 1 ]; then
 	notify "You have only one output! $script can't do nothing for you!
@@ -377,8 +376,6 @@ do
 	key="$1"
 	shift
 
-	update_outputs_connected
-	update_outputs_disconnected
 	update_outputs_active
 	update_outputs_active_num
 
@@ -396,14 +393,28 @@ do
 		echo "$outputs_disconnected"
 		;;
 	--clone | -c)
-		clone $1 $2
-		notify "$2 is clone of $1"
-		shift 2
+		if [ $2 ] && ! [[ $2 == -* ]]; then
+			clone $1 $2
+			notify "$2 is clone of $1"
+			shift
+		else
+			clone $1
+			notify "$1 cloned"
+		fi
+		shift
 		;;
 	--turn-on | -on)
-		turn_on $1 $2
-		notify "$1 turned on"
-		shift 2
+		echo $1 $2
+
+		if [ $2 ] && ! [[ $2 == -* ]]; then
+			turn_on $1 $2
+			notify "$1 turned on with mode $2"
+			shift
+		else
+			turn_on $1
+			notify "$1 turned on"
+		fi
+		shift
 		;;
 	--turn-off | -off)
 		turn_off $1
