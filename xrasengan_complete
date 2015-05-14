@@ -80,12 +80,12 @@ _xrasengan()
 
 	case $cur in
 	--*)
-		OPTS=$(echo "--force --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
+		OPTS=$(echo "--force --force-only --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		OPTS=$(echo "-f -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
+		OPTS=$(echo "-f -fo -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;

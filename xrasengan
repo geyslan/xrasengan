@@ -41,7 +41,7 @@ fi
 if ! [ -x "$notifier" ]; then
 	notifier="echo"
 else
-	notifier="$notifier -i /usr/share/icons/elementary/devices/64/video-display.svg"
+	notifier="$notifier -i video-display"
 fi
 
 notify() {
@@ -116,14 +116,11 @@ update_outputs_all() {
 
 	# Workaround to turn on connected outputs that may be in suspend mode
 	# and hence shown as disconnected
-	local times=2
-	local seconds=1
+	local seconds=3
 
-	while [ $times -gt 0 ]; do
-		$xrandr 1> /dev/null
-		sleep $seconds
-		let times-=1
-	done
+	$xrandr 1> /dev/null
+	sleep $seconds
+
 	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
 }
 
@@ -330,6 +327,7 @@ usage() {
   where options are:
   --help or -h
   --force or -f (workaround to turn on suspended outputs; will hang for 2 seconds)
+  --force-only or -fo (same as --force/-fo but as a single option)
   --list-all or -la
   --list-connected or -lc
   --list-active or -la
@@ -359,7 +357,23 @@ if list_contains "$*" "--force" || list_contains "$*" "-f"; then
 	fi
 fi
 
+if list_contains "$*" "--force-only" || list_contains "$*" "-fo"; then
+	set -- ${@/"--force-only"/};
+	set -- ${@/"-fo"/};
+	force="force"
+	if [[ $# -gt 0 ]]; then
+		usage
+		exit 0
+	fi
+fi
+
 update_outputs_all
+
+# --force-only || -fo
+if [[ $# -eq 0 ]] && [[ $force ]]; then
+	exit 0
+fi
+
 update_outputs_all_num
 update_outputs_connected
 update_outputs_disconnected
