@@ -1,7 +1,7 @@
 # -*- mode: sh -*-
 
 #
-# Copyright 2014 Geyslan G. Bem
+# Copyright 2015 Geyslan G. Bem
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,12 +80,12 @@ _xrasengan()
 
 	case $cur in
 	--*)
-		OPTS=$(echo "--force --force-only --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
+		OPTS=$(echo "--force --force-only --try-reload-active-layout --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;
 	-*)
-		OPTS=$(echo "-f -fo -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
+		OPTS=$(echo "-f -fo -tral -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
 		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
 		return 0
 		;;

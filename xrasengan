@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # -*- mode: sh -*-
 
 #
@@ -20,33 +22,65 @@
 # xrasengan - An xrandr wrapper to make your multi-monitor setup easier
 #
 
-#!/bin/bash
-
 script=xrasengan
 xrandr=$(which xrandr 2> /dev/null)
 awk=$(which awk 2> /dev/null)
+who=$(which who 2> /dev/null)
+unxrandr=$(which unxrandr 2> /dev/null)
 notifier=$(which notify-send 2> /dev/null)
 force=""
+display=$DISPLAY
 
-if ! [ -x "$xrandr" ]; then
-	echo "$script uses xrandr. Please, install it"
-	exit 2
-fi
+set_display() {
+	if ! [[ $display ]]; then
+		local tty=$(cat /sys/class/tty/tty0/active)
+		local pids=$(ps u | $awk -v tty=$tty '$0 ~ tty { print $2 }')
 
-if ! [ -x "$awk" ]; then
-	echo "$script uses awk. Please, install it"
-	exit 2
-fi
-
-if ! [ -x "$notifier" ]; then
-	notifier="echo"
-else
-	notifier="$notifier -i video-display"
-fi
+		for pid in $pids
+		do
+			display="$($awk -v RS='\0' -F= '$1=="DISPLAY" { print $2 }' /proc/$pid/environ 2>/dev/null)"
+			[[ "$display" != "" ]] && break
+		done
+	fi
+}
+set_display
 
 notify() {
 	$notifier "$@"
 }
+
+if ! [ -x "$notifier" ] || [ "$display" == "" ]; then
+	notifier="echo"
+else
+	notifier="$notifier -i video-display $script"
+fi
+
+if ! [[ $display ]]; then
+	notify "display was not found"
+	exit 2
+fi
+
+if ! [ -x "$xrandr" ]; then
+	notify "$script uses xrandr. Please, install it"
+	exit 2
+fi
+xrandr="$xrandr -d $display"
+
+
+if ! [ -x "$awk" ]; then
+	notify "$script uses awk. Please, install it"
+	exit 2
+fi
+
+if ! [ -x "$who" ]; then
+	notify "$script uses who. Please, install it"
+	exit 2
+fi
+
+if ! [ -x "$unxrandr" ]; then
+	notify "$script uses unxrandr that is part of arandr. Please, install it"
+	exit 2
+fi
 
 error_clone="clone option demands one or two outputs
 When one: all connected outputs will be a clone of the informed output
@@ -90,7 +124,7 @@ Here, HDMI-0 is the base and DVI-1 the below
 error_primary="primary option demands one argument
 The informed output will be set as primary with xrandr --primary option
   $0 --primary HDMI-0
-Or
+or
   $0 -p DisplayPort-0"
 
 invalid_argument() {
@@ -108,19 +142,23 @@ list_contains() {
 	return 1
 }
 
+workaround() {
+	# Workaround to turn on connected outputs that may be in suspend mode
+	# and hence shown as disconnected
+	local seconds=$1
+
+	$xrandr 1> /dev/null
+	sleep $seconds
+	$xrandr 1> /dev/null
+}
+
 update_outputs_all() {
 	if ! [[ $force ]]; then
 		outputs_all=$($xrandr | $awk '/connected/ {print $1}')
 		return
 	fi
 
-	# Workaround to turn on connected outputs that may be in suspend mode
-	# and hence shown as disconnected
-	local seconds=3
-
-	$xrandr 1> /dev/null
-	sleep $seconds
-
+	workaround 3
 	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
 }
 
@@ -322,12 +360,36 @@ primary() {
 	$xrandr --output $1 --primary
 }
 
+try_reload_current_layout() {
+	local command=""
+
+	command=$(DISPLAY=$display $unxrandr)
+
+	workaround 3
+
+	if ! [[ $command ]]; then
+		notify "$unxrandr could not retrieve current layout"
+		exit 2
+	fi
+
+	command="$xrandr ${command/xrandr/}"
+
+	$command
+
+	ret=$?
+	if ! [ $ret == 0 ]; then
+		notify "ERROR in $command (RETURN VALUE: $ret)"
+		exit 22
+	fi
+}
+
 usage() {
 	echo "usage: $script [options]
   where options are:
   --help or -h
-  --force or -f (workaround to turn on suspended outputs; will hang for 2 seconds)
+  --force or -f (workaround to turn on suspended outputs; will hang for 3 seconds)
   --force-only or -fo (same as --force/-fo but as a single option)
+  --try-reload-active-layout or -tral (uses force and unxrandr)
   --list-all or -la
   --list-connected or -lc
   --list-active or -la
@@ -341,6 +403,7 @@ usage() {
   --below <base-output> <below-output> or -b <base-output> <below-output>
   --primary <output> or -p <output>"
 }
+
 
 if [[ $# -eq 0 ]] || list_contains "$*" "--help" || list_contains "$*" "-h"; then
 	usage
@@ -365,19 +428,32 @@ if list_contains "$*" "--force-only" || list_contains "$*" "-fo"; then
 		usage
 		exit 0
 	fi
-fi
 
-update_outputs_all
-
-# --force-only || -fo
-if [[ $# -eq 0 ]] && [[ $force ]]; then
+	workaround 3
+	notify "successful force"
 	exit 0
 fi
 
+if list_contains "$*" "--try-reload-active-layout" || list_contains "$*" "-tral"; then
+	set -- ${@/"--try-reload-active-layout"/};
+	set -- ${@/"-tral"/};
+
+	if [[ $# -gt 0 ]]; then
+		usage
+		exit 0
+	fi
+
+	try_reload_current_layout
+	notify "current layout reloaded"
+	exit 0
+fi
+
+
+
+update_outputs_all
 update_outputs_all_num
 update_outputs_connected
 update_outputs_disconnected
-
 
 if [ $outputs_all_num -eq 1 ]; then
 	notify "You have only one output! $script can't do nothing for you!
@@ -418,8 +494,6 @@ do
 		shift
 		;;
 	--turn-on | -on)
-		echo $1 $2
-
 		if [ $2 ] && ! [[ $2 == -* ]]; then
 			turn_on $1 $2
 			notify "$1 turned on with mode $2"
