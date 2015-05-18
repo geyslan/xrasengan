@@ -26,6 +26,8 @@ Usage
 
 `xrasengan -c DisplayPort-0 HDMI-0`
 
+`xrasengan -tral` - try that before through your displayport monitor out the window
+
 
 See all options through:
 ------------------------
