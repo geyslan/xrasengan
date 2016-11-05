@@ -33,12 +33,14 @@ display=$DISPLAY
 
 set_display() {
 	if ! [[ $display ]]; then
-		local tty=$(cat /sys/class/tty/tty0/active)
-		local pids=$(ps u | $awk -v tty=$tty '$0 ~ tty { print $2 }')
+		local tty
+		local pids
+		tty=$(cat /sys/class/tty/tty0/active)
+		pids=$(ps u | $awk "/$tty/ { print \$2 }")
 
 		for pid in $pids
 		do
-			display="$($awk -v RS='\0' -F= '$1=="DISPLAY" { print $2 }' /proc/$pid/environ 2>/dev/null)"
+			display=$($awk -v RS='\0' -F= "/DISPLAY/ { print \$2 }" /proc/"$pid"/environ 2>/dev/null)
 			[[ "$display" != "" ]] && break
 		done
 	fi
@@ -137,7 +139,7 @@ list_contains() {
 	local value=$2
 
 	for word in $list; do
-		[ $word == $value ] && return 0
+		[ "$word" == "$value" ] && return 0
 	done
 	return 1
 }
@@ -148,50 +150,50 @@ workaround() {
 	local seconds=$1
 
 	$xrandr 1> /dev/null
-	sleep $seconds
+	sleep "$seconds"
 	$xrandr 1> /dev/null
 }
 
 update_outputs_all() {
 	if ! [[ $force ]]; then
-		outputs_all=$($xrandr | $awk '/connected/ {print $1}')
+		outputs_all=$($xrandr | $awk "/connected/ { print \$1 }")
 		return
 	fi
 
 	workaround 3
-	outputs_all=$($xrandr | $awk '/connected/ {print $1}')
+	outputs_all=$($xrandr | $awk "/connected/ { print \$1 }")
 }
 
 update_outputs_all_num() {
-	outputs_all_num=$(echo $outputs_all | wc -w)
+	outputs_all_num=$(echo "$outputs_all" | wc -w)
 }
 
 update_outputs_connected() {
-	outputs_connected=$($xrandr | $awk '/ connected/ {print $1}')
+	outputs_connected=$($xrandr | $awk "/ connected/ { print \$1 }")
 }
 
 update_outputs_active() {
-	# outputs_active=$($xrandr | $awk '/[0-9] \(/ {print $1}')
-	outputs_active=$($xrandr | $awk '/mm$/ {print $1}')
+	outputs_active=$($xrandr | $awk "/mm$/ { print \$1 }")
 }
 
 update_outputs_active_num() {
-	outputs_active_num=$(echo $outputs_active | wc -w)
+	outputs_active_num=$(echo "$outputs_active" | wc -w)
 }
 
 update_outputs_disconnected() {
-	outputs_disconnected=$($xrandr | $awk '/disconnected/ {print $1}')
+	outputs_disconnected=$($xrandr | $awk "/disconnected/ { print \$1 }")
 }
 
 is_mode_available() {
-	if ! [ $1 ] || ! [ $2 ]; then
+	if ! [ "$1" ] || ! [ "$2" ]; then
 		invalid_argument "${FUNCNAME[0]}: needs two arguments (output and mode)"
 	fi
 
 	local output=$1
-	local modes=$($xrandr | $awk '/'"$output"'/{f=1;next} !/^ /{f=0} f {print $1}')
+	local modes
+	modes=$($xrandr | $awk '/'"$output"'/{f=1;next} !/^ /{f=0} f {print $1}')
 
-	if ! list_contains "$modes" $2; then
+	if ! list_contains "$modes" "$2"; then
 		return 1
 	else
 		return 0
@@ -199,11 +201,11 @@ is_mode_available() {
 }
 
 check_output_valid() {
-	if ! [ $1 ]; then
+	if ! [ "$1" ]; then
 		invalid_argument "${FUNCNAME[0]}: needs one argument"
 	fi
 
-	if ! list_contains "$outputs_all" $1; then
+	if ! list_contains "$outputs_all" "$1"; then
 		return 1
 	else
 		return 0
@@ -211,15 +213,15 @@ check_output_valid() {
 }
 
 check_output_connected() {
-	if ! [ $1 ]; then
+	if ! [ "$1" ]; then
 		invalid_argument "${FUNCNAME[0]}: needs one argument"
 	fi
 
-	if ! check_output_valid $1; then
+	if ! check_output_valid "$1"; then
 		invalid_argument "$1 is not a valid output"
 	fi
 
-	if ! list_contains "$outputs_connected" $1; then
+	if ! list_contains "$outputs_connected" "$1"; then
 		return 1
 	else
 		return 0
@@ -227,15 +229,15 @@ check_output_connected() {
 }
 
 check_output_active() {
-	if ! [ $1 ]; then
+	if ! [ "$1" ]; then
 		invalid_argument "${FUNCNAME[0]}: needs one argument"
 	fi
 
-	if ! check_output_connected $1; then
+	if ! check_output_connected "$1"; then
 		invalid_argument "$1 is not a connected output"
 	fi
 
-	if ! list_contains "$outputs_active" $1; then
+	if ! list_contains "$outputs_active" "$1"; then
 		return 1
 	else
 		return 0
@@ -247,17 +249,17 @@ clone() {
 		invalid_argument "$error_clone"
 	fi
 
-	check_output_active $1
+	check_output_active "$1"
 
-	if [ $2 ]; then
-		check_output_connected $2
-		$xrandr --output $2 --auto --same-as $1 --auto
+	if [ "$2" ]; then
+		check_output_connected "$2"
+		$xrandr --output "$2" --auto --same-as "$1" --auto
 	else
-		$xrandr --output $1 --primary
+		$xrandr --output "$1" --primary
 		for output in $outputs_connected
 		do
-			if [ $output != $1 ]; then
-				$xrandr --output $output --auto --same-as $1 --auto
+			if [ "$output" != "$1" ]; then
+				$xrandr --output "$output" --auto --same-as "$1" --auto
 			fi
 		done
 	fi
@@ -268,15 +270,15 @@ turn_on() {
 		invalid_argument "$error_turn_on"
 	fi
 
-	check_output_active $1
+	check_output_active "$1"
 
-	if [ $2 ]; then
-		if ! is_mode_available $1 $2; then
+	if [ "$2" ]; then
+		if ! is_mode_available "$1" "$2"; then
 			invalid_argument "$2 is not an available mode for $1 output"
 		fi
-		$xrandr --output $1 --mode $2 --auto
+		$xrandr --output "$1" --mode "$2" --auto
 	else
-		$xrandr --output $1 --auto
+		$xrandr --output "$1" --auto
 	fi
 }
 
@@ -285,15 +287,15 @@ turn_off() {
 		invalid_argument "$error_turn_off"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is already an inactive output"
 	fi
 
-	if [ $outputs_active_num -eq 1 ]; then
+	if [ "$outputs_active_num" -eq 1 ]; then
 		invalid_argument "$1 is the unique active output. It's impossible to turn it off"
 	fi
 
-	$xrandr --output $1 --off
+	$xrandr --output "$1" --off
 }
 
 left() {
@@ -301,12 +303,12 @@ left() {
 		invalid_argument "$error_left"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is not an active output"
 	fi
 
-	check_output_connected $2
-	$xrandr --output $2 --auto --left-of $1 --auto
+	check_output_connected "$2"
+	$xrandr --output "$2" --auto --left-of "$1" --auto
 }
 
 right() {
@@ -314,12 +316,12 @@ right() {
 		invalid_argument "$error_right"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is not an active output"
 	fi
 
-	check_output_connected $2
-	$xrandr --output $2 --auto --right-of $1 --auto
+	check_output_connected "$2"
+	$xrandr --output "$2" --auto --right-of "$1" --auto
 }
 
 above() {
@@ -327,12 +329,12 @@ above() {
 		invalid_argument "$error_above"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is not an active output"
 	fi
 
-	check_output_connected $2
-	$xrandr --output $2 --auto --above $1 --auto
+	check_output_connected "$2"
+	$xrandr --output "$2" --auto --above "$1" --auto
 }
 
 below() {
@@ -340,12 +342,12 @@ below() {
 		invalid_argument "$error_below"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is not an active output"
 	fi
 
-	check_output_connected $2
-	$xrandr --output $2 --auto --below $1 --auto
+	check_output_connected "$2"
+	$xrandr --output "$2" --auto --below "$1" --auto
 }
 
 primary() {
@@ -353,11 +355,11 @@ primary() {
 		invalid_argument "$error_primary"
 	fi
 
-	if ! check_output_active $1; then
+	if ! check_output_active "$1"; then
 		invalid_argument "$1 is not an active output"
 	fi
 
-	$xrandr --output $1 --primary
+	$xrandr --output "$1" --primary
 }
 
 try_reload_current_layout() {
@@ -392,7 +394,7 @@ usage() {
   --try-reload-active-layout or -tral (uses force and unxrandr)
   --list-all or -la
   --list-connected or -lc
-  --list-active or -la
+  --list-active or -lac
   --list-disconnected or -ld
   --clone <base-output> or -c <base-output> <cloned-output>
   --turn-on <output> or -on <output> <mode>
@@ -411,8 +413,8 @@ if [[ $# -eq 0 ]] || list_contains "$*" "--help" || list_contains "$*" "-h"; the
 fi
 
 if list_contains "$*" "--force" || list_contains "$*" "-f"; then
-	set -- ${@/"--force"/};
-	set -- ${@/"-f"/};
+	set -- ${@/--force/}
+	set -- ${@/-f/}
 	force="force";
 	if [[ $# -eq 0 ]]; then
 		usage
@@ -421,8 +423,8 @@ if list_contains "$*" "--force" || list_contains "$*" "-f"; then
 fi
 
 if list_contains "$*" "--force-only" || list_contains "$*" "-fo"; then
-	set -- ${@/"--force-only"/};
-	set -- ${@/"-fo"/};
+	set -- ${@/--force-only/}
+	set -- ${@/-fo/}
 	force="force"
 	if [[ $# -gt 0 ]]; then
 		usage
@@ -435,8 +437,8 @@ if list_contains "$*" "--force-only" || list_contains "$*" "-fo"; then
 fi
 
 if list_contains "$*" "--try-reload-active-layout" || list_contains "$*" "-tral"; then
-	set -- ${@/"--try-reload-active-layout"/};
-	set -- ${@/"-tral"/};
+	set -- ${@/--try-reload-active-layout/}
+	set -- ${@/-tral/}
 
 	if [[ $# -gt 0 ]]; then
 		usage
@@ -455,7 +457,7 @@ update_outputs_all_num
 update_outputs_connected
 update_outputs_disconnected
 
-if [ $outputs_all_num -eq 1 ]; then
+if [ "$outputs_all_num" -eq 1 ]; then
 	notify "You have only one output! $script can't do nothing for you!
 For more options use xrandr. Bye!"
 	exit 0
@@ -483,54 +485,54 @@ do
 		echo "$outputs_disconnected"
 		;;
 	--clone | -c)
-		if [ $2 ] && ! [[ $2 == -* ]]; then
-			clone $1 $2
+		if [[ $2 ]] && ! [[ $2 == -* ]]; then
+			clone "$1" "$2"
 			notify "$2 is clone of $1"
 			shift
 		else
-			clone $1
+			clone "$1"
 			notify "$1 cloned"
 		fi
 		shift
 		;;
 	--turn-on | -on)
-		if [ $2 ] && ! [[ $2 == -* ]]; then
-			turn_on $1 $2
+		if [[ $2 ]] && ! [[ $2 == -* ]]; then
+			turn_on "$1" "$2"
 			notify "$1 turned on with mode $2"
 			shift
 		else
-			turn_on $1
+			turn_on "$1"
 			notify "$1 turned on"
 		fi
 		shift
 		;;
 	--turn-off | -off)
-		turn_off $1
+		turn_off "$1"
 		notify "$1 turned off"
 		shift
 		;;
 	--left | -l)
-		left $1 $2
+		left "$1" "$2"
 		notify "$2 is on left of $1"
 		shift 2
 		;;
 	--right | -r)
-		right $1 $2
+		right "$1" "$2"
 		notify "$2 is on right of $1"
 		shift 2
 		;;
 	--above | -a)
-		above $1 $2
+		above "$1" "$2"
 		notify "$2 is above of $1"
 		shift 2
 		;;
 	--below | -b)
-		below $1 $2
+		below "$1" "$2"
 		notify "$2 is below of $1"
 		shift 2
 		;;
 	--primary | -p)
-		primary $1
+		primary "$1"
 		notify "$1 set as primary"
 		shift
 		;;
@@ -540,3 +542,4 @@ do
 		;;
 	esac
 done
+

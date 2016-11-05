@@ -27,7 +27,7 @@ list_contains() {
 	local value=$2
 
 	for word in $list; do
-		[ $word == $value ] && return 0
+		[[ $word == "$value" ]] && return 0
 	done
 	return 1
 }
@@ -44,7 +44,7 @@ update_outputs_connected() {
 	local seconds=1
 
 	while [ $times -gt 0 ]; do
-		$xrandr 1> /dev/null
+		xrandr 1> /dev/null
 		sleep $seconds
 		let times-=1
 	done
@@ -81,12 +81,12 @@ _xrasengan()
 	case $cur in
 	--*)
 		OPTS=$(echo "--force --force-only --try-reload-active-layout --help --list-all --list-connected --list-active --list-disconnected --clone --turn-on --turn-off --left --right --above --below --primary" | sort)
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 	-*)
 		OPTS=$(echo "-f -fo -tral -h -la -lc -lac -ld -c -on -off -l -r -a -b -p" | sort)
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 
@@ -97,12 +97,12 @@ _xrasengan()
 	case $prev in
 		--clone | -c | --turn-off | -off | --left | -l | --right | -r | --above | -a | --below | -b | --primary | -p)
 		update_outputs_active
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 	--turn-on | -on)
 		update_outputs_connected_inactive
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 
@@ -110,15 +110,16 @@ _xrasengan()
 
 	case $prev_prev in
 	--clone | -c | --left | -l | --right | -r | --above | -a | --below | -b)
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 	--turn-on | -on)
-		update_output_modes $prev
-		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- $cur) )
+		update_output_modes "$prev"
+		COMPREPLY=( $(compgen -W "${OPTS[*]}" -- "$cur") )
 		return 0
 		;;
 	esac
 
 }
 complete -F _xrasengan xrasengan
+
